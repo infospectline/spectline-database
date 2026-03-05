@@ -1,1 +1,92 @@
+\set ON_ERROR_STOP on
+\set QUIET 1
 
+\copy (
+  with active_org as (
+    select
+      o.id,
+      o.main_activity_code_id,
+      o.actualized_at
+    from rpo.organizations o
+    where o.terminated_on is null
+      and o.deleted_at is null
+      and o.source_register is not null
+  ),
+
+  ico_per_org as (
+    -- IPO = IČO (v RPO je to v stĺpci ipo). Berieme aktuálne (effective_to is null).
+    select
+      e.organization_id,
+      lpad(e.ipo::text, 8, '0') as ico
+    from rpo.organization_identifier_entries e
+    where e.ipo is not null
+      and e.effective_to is null
+  ),
+
+  name_per_org as (
+    -- aktuálny názov (effective_to is null), zoberieme najnovší podľa effective_from
+    select distinct on (n.organization_id)
+      n.organization_id,
+      n.name as business_name
+    from rpo.organization_name_entries n
+    where n.effective_to is null
+    order by n.organization_id, n.effective_from desc
+  ),
+
+  address_per_org as (
+    -- aktuálna adresa (effective_to is null), zoberieme najnovšiu podľa effective_from
+    select distinct on (a.organization_id)
+      a.organization_id,
+      coalesce(
+        a.formatted_address,
+        concat_ws(', ',
+          nullif(trim(concat_ws(' ',
+            a.street,
+            nullif(
+              trim(both '/' from concat_ws('/',
+                nullif(a.reg_number::text, ''),
+                nullif(a.building_number, '')
+              )),
+              ''
+            )
+          )), ''),
+          nullif(trim(concat_ws(' ', a.postal_code, a.municipality)), ''),
+          nullif(a.district, ''),
+          nullif(a.country, '')
+        )
+      ) as address
+    from rpo.organization_address_entries a
+    where a.effective_to is null
+    order by a.organization_id, a.effective_from desc
+  ),
+
+  activity_per_org as (
+    -- všetky aktuálne predmety činnosti spojíme do jedného textu
+    select
+      ea.organization_id,
+      string_agg(ea.description, '; ' order by ea.description) as business_activity
+    from rpo.organization_economic_activity_entries ea
+    where ea.effective_to is null
+    group by ea.organization_id
+  )
+
+  -- stage tabuľka má PRIMARY KEY na ico -> musíme vygenerovať max 1 riadok na jedno IČO
+  select distinct on (i.ico)
+    i.ico,
+    n.business_name,
+    act.business_activity,
+    mac.name as sector,
+    adr.address,
+    null::float8 as latitude,
+    null::float8 as longitude,
+    null::text as email,
+    null::text as phone
+  from active_org o
+  join ico_per_org i on i.organization_id = o.id
+  left join name_per_org n on n.organization_id = o.id
+  left join address_per_org adr on adr.organization_id = o.id
+  left join activity_per_org act on act.organization_id = o.id
+  left join rpo.main_activity_codes mac on mac.id = o.main_activity_code_id
+  where n.business_name is not null
+  order by i.ico, o.actualized_at desc nulls last, o.id desc
+) to stdout with (format csv);
