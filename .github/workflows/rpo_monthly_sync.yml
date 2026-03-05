@@ -1,9 +1,9 @@
 name: Monthly RPO -> Supabase companies sync
 
 on:
-  workflow_dispatch:
   schedule:
     - cron: "15 3 1 * *"
+  workflow_dispatch:
 
 jobs:
   sync:
@@ -71,17 +71,15 @@ jobs:
           set -euo pipefail
           psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -c "truncate public.companies_stage;"
 
-      - name: Export active companies from RPO -> Load to Supabase stage (stream)
+      - name: Export active companies -> Load stage (stream)
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           set -euo pipefail
-          # 1) export CSV zo ZDOJA (lokálny Postgres s RPO)
-          # 2) rovno to pošle do Supabase cez \copy ... from stdin
           PGPASSWORD=postgres psql -h localhost -p 5432 -U postgres -d postgres -q -f scripts/extract_active_companies.psql \
           | psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -c "\copy public.companies_stage (ico,business_name,business_activity,sector,address,latitude,longitude,email,phone) from stdin with (format csv);"
 
-      - name: Upsert + delete inactive (Supabase)
+      - name: Upsert + delete inactive
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
