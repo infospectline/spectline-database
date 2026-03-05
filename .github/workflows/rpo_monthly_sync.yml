@@ -2,9 +2,8 @@ name: Monthly RPO -> Supabase companies sync
 
 on:
   schedule:
-    # 1. deň v mesiaci o 03:15 UTC
-    - cron: "15 3 1 * *"
-  workflow_dispatch: {}
+    - cron: '15 3 1 * *'
+  workflow_dispatch:
 
 jobs:
   sync:
