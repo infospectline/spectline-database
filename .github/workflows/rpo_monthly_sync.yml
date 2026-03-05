@@ -1,9 +1,9 @@
 name: Monthly RPO -> Supabase companies sync
 
-on:
+"on":
   schedule:
     - cron: "15 3 1 * *"
-  workflow_dispatch:
+  workflow_dispatch: {}
 
 jobs:
   sync:
@@ -45,12 +45,30 @@ jobs:
           set -euo pipefail
           gunzip -c rpo.sql.gz | PGPASSWORD=postgres psql -h localhost -p 5432 -U postgres -d postgres -v ON_ERROR_STOP=1
 
-      - name: Ensure companies_stage exists (Supabase)
+      - name: Build Supabase conninfo (force IPv4)
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           set -euo pipefail
-          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -c "
+          python3 - <<'PY' > /tmp/supabase_conninfo.txt
+          import os, socket, urllib.parse
+          u = urllib.parse.urlparse(os.environ["SUPABASE_DB_URL"])
+          user = urllib.parse.unquote(u.username or "")
+          pwd  = urllib.parse.unquote(u.password or "")
+          host = u.hostname
+          port = u.port or 5432
+          db   = (u.path or "/postgres").lstrip("/") or "postgres"
+          q    = urllib.parse.parse_qs(u.query)
+          sslmode = (q.get("sslmode", ["require"])[0])
+          ip = socket.getaddrinfo(host, port, family=socket.AF_INET, type=socket.SOCK_STREAM)[0][4][0]
+          print(f"host={host} hostaddr={ip} port={port} dbname={db} user={user} password={pwd} sslmode={sslmode}")
+          PY
+          echo "SUPABASE_CONNINFO=$(cat /tmp/supabase_conninfo.txt)" >> $GITHUB_ENV
+
+      - name: Ensure companies_stage exists (Supabase)
+        run: |
+          set -euo pipefail
+          psql "$SUPABASE_CONNINFO" -v ON_ERROR_STOP=1 -c "
             create table if not exists public.companies_stage (
               ico text primary key,
               business_name text not null,
@@ -65,26 +83,20 @@ jobs:
           "
 
       - name: Truncate stage
-        env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           set -euo pipefail
-          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -c "truncate public.companies_stage;"
+          psql "$SUPABASE_CONNINFO" -v ON_ERROR_STOP=1 -c "truncate public.companies_stage;"
 
       - name: Export active companies -> Load stage (stream)
-        env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           set -euo pipefail
           PGPASSWORD=postgres psql -h localhost -p 5432 -U postgres -d postgres -q -f scripts/extract_active_companies.psql \
-          | psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -c "\copy public.companies_stage (ico,business_name,business_activity,sector,address,latitude,longitude,email,phone) from stdin with (format csv);"
+          | psql "$SUPABASE_CONNINFO" -v ON_ERROR_STOP=1 -c "\copy public.companies_stage (ico,business_name,business_activity,sector,address,latitude,longitude,email,phone) from stdin with (format csv);"
 
       - name: Upsert + delete inactive
-        env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           set -euo pipefail
-          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f scripts/supabase_sync.sql
+          psql "$SUPABASE_CONNINFO" -v ON_ERROR_STOP=1 -f scripts/supabase_sync.sql
 
       - name: Cleanup
         if: always()
