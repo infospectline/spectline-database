@@ -1,13 +1,14 @@
-name: Test workflow trigger
+name: Monthly RPO -> Supabase companies sync
 
-"on":
+on:
+  schedule:
+    - cron: "15 3 1 * *"
   workflow_dispatch:
 
 jobs:
-  test:
+  sync:
     runs-on: ubuntu-latest
-    steps:
-      - run: echo "OK - workflow triggers work"
+    timeout-minutes: 360
 
     env:
       RPO_DUMP_URL: "https://s3.eu-central-1.amazonaws.com/ekosystem-slovensko-digital-dumps/rpo.sql.gz"
