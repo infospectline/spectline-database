@@ -1,1 +1,95 @@
+name: Monthly RPO -> Supabase companies sync
 
+on:
+  schedule:
+    # 1. deň v mesiaci o 03:15 UTC
+    - cron: "15 3 1 * *"
+  workflow_dispatch: {}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    env:
+      RPO_DUMP_URL: "https://s3.eu-central-1.amazonaws.com/ekosystem-slovensko-digital-dumps/rpo.sql.gz"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client curl gzip
+
+      - name: Start local Postgres (temporary)
+        run: |
+          set -euo pipefail
+          docker run -d --name rpo-pg -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres:16
+          for i in {1..60}; do
+            PGPASSWORD=postgres pg_isready -h localhost -p 5432 -U postgres && exit 0
+            sleep 2
+          done
+          echo "Postgres not ready" >&2
+          exit 1
+
+      - name: Download RPO dump
+        run: |
+          set -euo pipefail
+          curl -L "$RPO_DUMP_URL" -o rpo.sql.gz
+          ls -lh rpo.sql.gz
+
+      - name: Import RPO into local Postgres
+        run: |
+          set -euo pipefail
+          gunzip -c rpo.sql.gz | PGPASSWORD=postgres psql -h localhost -p 5432 -U postgres -d postgres -v ON_ERROR_STOP=1
+
+      - name: Ensure companies_stage exists (Supabase)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -c "
+            create table if not exists public.companies_stage (
+              ico text primary key,
+              business_name text not null,
+              business_activity text,
+              sector text,
+              address text,
+              latitude double precision,
+              longitude double precision,
+              email text,
+              phone text
+            );
+          "
+
+      - name: Truncate stage
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -c "truncate public.companies_stage;"
+
+      - name: Export active companies from RPO -> Load to Supabase stage (stream)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          # 1) export CSV zo ZDOJA (lokálny Postgres s RPO)
+          # 2) rovno to pošle do Supabase cez \copy ... from stdin
+          PGPASSWORD=postgres psql -h localhost -p 5432 -U postgres -d postgres -q -f scripts/extract_active_companies.psql \
+          | psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -c "\copy public.companies_stage (ico,business_name,business_activity,sector,address,latitude,longitude,email,phone) from stdin with (format csv);"
+
+      - name: Upsert + delete inactive (Supabase)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f scripts/supabase_sync.sql
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker rm -f rpo-pg || true
