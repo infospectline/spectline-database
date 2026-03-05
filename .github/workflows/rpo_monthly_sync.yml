@@ -1,4 +1,4 @@
-name: Monthly RPO -> Supabase companies sync
+name: "Monthly RPO to Supabase companies sync"
 
 on:
   schedule:
