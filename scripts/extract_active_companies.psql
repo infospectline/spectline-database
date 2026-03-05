@@ -18,7 +18,7 @@
     select
       e.organization_id,
       lpad(e.ipo::text, 8, '0') as ico
-    from public.organization_identifier_entries e
+    from rpo.organization_identifier_entries e
     where e.ipo is not null
       and e.effective_to is null
   ),
@@ -28,7 +28,7 @@
     select distinct on (n.organization_id)
       n.organization_id,
       n.name as business_name
-    from public.organization_name_entries n
+    from rpo.organization_name_entries n
     where n.effective_to is null
     order by n.organization_id, n.effective_from desc
   ),
@@ -55,7 +55,7 @@
           nullif(a.country, '')
         )
       ) as address
-    from public.organization_address_entries a
+    from rpo.organization_address_entries a
     where a.effective_to is null
     order by a.organization_id, a.effective_from desc
   ),
@@ -65,7 +65,7 @@
     select
       ea.organization_id,
       string_agg(ea.description, '; ' order by ea.description) as business_activity
-    from public.organization_economic_activity_entries ea
+    from rpo.organization_economic_activity_entries ea
     where ea.effective_to is null
     group by ea.organization_id
   )
@@ -86,7 +86,7 @@
   left join name_per_org n on n.organization_id = o.id
   left join address_per_org adr on adr.organization_id = o.id
   left join activity_per_org act on act.organization_id = o.id
-  left join public.main_activity_codes mac on mac.id = o.main_activity_code_id
+  left join rpo.main_activity_codes mac on mac.id = o.main_activity_code_id
   where n.business_name is not null
   order by i.ico, o.actualized_at desc nulls last, o.id desc
 ) to stdout with (format csv);
