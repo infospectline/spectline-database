@@ -45,6 +45,18 @@ jobs:
           set -euo pipefail
           gunzip -c rpo.sql.gz | PGPASSWORD=postgres psql -h localhost -p 5432 -U postgres -d postgres -v ON_ERROR_STOP=1
 
+      - name: Debug Supabase URL (safe)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          python3 - <<'PY'
+          import os, urllib.parse
+          u = urllib.parse.urlparse(os.environ["SUPABASE_DB_URL"].strip())
+          print("HOST =", u.hostname)
+          print("USER =", u.username)
+          print("DB   =", u.path)
+          PY
+          
       - name: Ensure companies_stage exists (Supabase via pooler)
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
