@@ -21,7 +21,13 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y postgresql-client curl gzip
+          sudo apt-get install -y postgresql-client curl gzip python3-pip
+
+      - name: Install python deps
+        run: |
+          set -euo pipefail
+          python3 -m pip install --upgrade pip
+          python3 -m pip install psycopg2-binary
 
       - name: Start local Postgres (temporary)
         run: |
@@ -83,13 +89,14 @@ jobs:
           set -euo pipefail
           psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -c "truncate public.companies_stage;"
 
-      - name: Export active companies -> Load stage (stream)
+      - name: Load stage iteratively (company-by-company)
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          BATCH_SIZE: "1000"
+          PRINT_EVERY: "10000"
         run: |
           set -euo pipefail
-          PGPASSWORD=postgres psql -h localhost -p 5432 -U postgres -d postgres -q -f scripts/extract_active_companies.psql \
-          | psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -c "\copy public.companies_stage (ico,business_name,business_activity,sector,address,latitude,longitude,email,phone) from stdin with (format csv);"
+          python3 scripts/load_stage_iter.py
 
       - name: Upsert + delete inactive
         env:
