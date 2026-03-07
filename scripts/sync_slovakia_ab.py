@@ -198,13 +198,18 @@ def load_into_inactive(local_conn, supa_conn, target_table):
     cur.execute(QUERY)
 
     def flush(rows):
-        nonlocal total
-        if not rows:
-            return
-        with supa_conn.cursor() as c2:
-            # rows already prepared in correct order
-            execute_values(c2, insert_sql, rows, page_size=len(rows))
-        supa_conn.commit()
+      if not rows:
+          return
+
+      dedup = {}
+      for r in rows:
+          dedup[r[1]] = r  # key = ico, posledný vyhráva
+  
+      rows2 = list(dedup.values())
+  
+      with supa_conn.cursor() as c2:
+          execute_values(c2, insert_sql, rows2, page_size=len(rows2))
+      supa_conn.commit()
 
     for row in cur:
         ico, business_name, business_activity, sector, address, lat, lng, email, phone = row
