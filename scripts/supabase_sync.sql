@@ -1,5 +1,4 @@
--- scripts/supabase_sync.sql
--- 1) Upsert (insert/update) aktívnych firiem zo stage do finálnej tabuľky
+-- 1) Upsert do companies (dedupe stage podľa ico)
 insert into public.companies (
   ico,
   business_name,
@@ -25,25 +24,28 @@ select
   s.phone,
   now(),
   now()
-from public.companies_stage s
+from (
+  select distinct on (ico)
+    ico, business_name, business_activity, sector, address,
+    latitude, longitude, email, phone
+  from public.companies_stage
+  where ico is not null and business_name is not null
+  order by ico
+) s
 on conflict (ico) do update
 set
   business_name     = excluded.business_name,
   business_activity = excluded.business_activity,
   sector            = excluded.sector,
   address           = excluded.address,
-
-  -- enrichment nechaj existujúci, ak stage nemá hodnotu (NULL)
   email     = coalesce(excluded.email, public.companies.email),
   phone     = coalesce(excluded.phone, public.companies.phone),
   latitude  = coalesce(excluded.latitude, public.companies.latitude),
   longitude = coalesce(excluded.longitude, public.companies.longitude),
-
   updated_at = now();
 
+-- 2) vymaž neaktívne (čo nie je v stage)
 delete from public.companies c
 where not exists (
-  select 1
-  from public.companies_stage s
-  where s.ico = c.ico
+  select 1 from public.companies_stage s where s.ico = c.ico
 );
