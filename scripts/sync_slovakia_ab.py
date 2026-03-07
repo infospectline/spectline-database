@@ -178,7 +178,7 @@ def load_into_inactive(local_conn, supa_conn, target_table):
         (row_type, ico, business_name, business_activity, sector, address,
          latitude, longitude, email, phone)
       values %s
-      on conflict (ico) do update
+      on conflict (ico, row_type) do update
       set
         business_name = excluded.business_name,
         business_activity = excluded.business_activity,
