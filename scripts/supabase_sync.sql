@@ -1,3 +1,6 @@
+set statement_timeout = 0;
+set lock_timeout = 0;
+
 -- 1) Upsert do companies (dedupe stage podľa ico)
 insert into public.companies (
   ico,
