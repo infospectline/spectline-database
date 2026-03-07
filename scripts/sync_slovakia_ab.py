@@ -176,8 +176,20 @@ def load_into_inactive(local_conn, supa_conn, target_table):
     insert_sql = f"""
       insert into {target_table}
         (row_type, ico, business_name, business_activity, sector, address,
-         latitude, longitude, email, phone, updated_at, created_at)
+         latitude, longitude, email, phone)
       values %s
+      on conflict (ico) do update
+      set
+        business_name = excluded.business_name,
+        business_activity = excluded.business_activity,
+        sector = excluded.sector,
+        address = excluded.address,
+        latitude = excluded.latitude,
+        longitude = excluded.longitude,
+        email = excluded.email,
+        phone = excluded.phone,
+        updated_at = now()
+      where {target_table}.row_type = 'company';
     """
 
     # server-side cursor to avoid loading all into memory
@@ -202,18 +214,16 @@ def load_into_inactive(local_conn, supa_conn, target_table):
             continue
 
         batch.append((
-            "company",
-            ico,
-            business_name,
-            business_activity,
-            sector,
-            address,
-            lat,
-            lng,
-            email,
-            phone,
-            None,  # updated_at default now() is fine, but we set in SQL with now() via DEFAULT; keep None -> will insert NULL
-            None   # created_at
+          "company",
+          ico,
+          business_name,
+          business_activity,
+          sector,
+          address,
+          lat,
+          lng,
+          email,
+          phone
         ))
         total += 1
 
