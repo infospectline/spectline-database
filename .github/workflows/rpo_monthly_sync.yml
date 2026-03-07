@@ -1,9 +1,13 @@
-name: Monthly RPO -> Supabase companies sync
+name: Slovakia companies A/B weekly sync
 
 "on":
   schedule:
-    - cron: "15 3 1 * *"
+    - cron: "0 2 * * 0" # Sunday 02:00 UTC (03:00 CET in winter)
   workflow_dispatch: {}
+
+concurrency:
+  group: slovakia-companies-sync
+  cancel-in-progress: true
 
 jobs:
   sync:
@@ -51,60 +55,14 @@ jobs:
           set -euo pipefail
           gunzip -c rpo.sql.gz | PGPASSWORD=postgres psql -h localhost -p 5432 -U postgres -d postgres -v ON_ERROR_STOP=1
 
-      - name: Debug Supabase URL (safe)
-        env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-        run: |
-          python3 - <<'PY'
-          import os, urllib.parse
-          u = urllib.parse.urlparse(os.environ["SUPABASE_DB_URL"].strip())
-          print("HOST =", u.hostname)
-          print("USER =", u.username)
-          print("DB   =", u.path)
-          PY
-          
-      - name: Ensure companies_stage exists (Supabase via pooler)
-        env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-        run: |
-          set -euo pipefail
-          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -c "
-            create table if not exists public.companies_stage (
-              ico text primary key,
-              business_name text not null,
-              business_activity text,
-              sector text,
-              address text,
-              latitude double precision,
-              longitude double precision,
-              email text,
-              phone text
-            );
-          "
-
-      - name: Truncate stage
-        env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-        run: |
-          set -euo pipefail
-          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -c "truncate public.companies_stage;"
-
-      - name: Load stage iteratively (company-by-company)
+      - name: Sync Slovakia companies (A/B swap)
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           BATCH_SIZE: "1000"
           PRINT_EVERY: "10000"
         run: |
           set -euo pipefail
-          python3 scripts/load_stage_iter.py
-
-      - name: Upsert + delete inactive
-        env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-          PGOPTIONS: "-c statement_timeout=0"
-        run: |
-          set -euo pipefail
-          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f scripts/supabase_sync.sql
+          python3 scripts/sync_slovakia_ab.py
 
       - name: Cleanup
         if: always()
