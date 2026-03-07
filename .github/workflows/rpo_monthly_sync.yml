@@ -101,6 +101,7 @@ jobs:
       - name: Upsert + delete inactive
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGOPTIONS: "-c statement_timeout=0"
         run: |
           set -euo pipefail
           psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f scripts/supabase_sync.sql
