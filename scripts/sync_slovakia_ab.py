@@ -1,6 +1,10 @@
+import json
 import os
 import time
 import uuid
+import unicodedata
+from pathlib import Path
+
 import psycopg2
 from psycopg2.extras import execute_values
 
@@ -14,6 +18,16 @@ PRINT_EVERY = int(os.environ.get("PRINT_EVERY", "10000"))
 
 TABLE_A = "public.slovakia_companies_variant_a"
 TABLE_B = "public.slovakia_companies_variant_b"
+TABLE_CACHE = "public.slovakia_company_cache"
+
+COUNTRY_CODE = os.environ.get("COUNTRY_CODE", "sk").strip().lower()
+REPO_ROOT = Path(os.environ.get("GITHUB_WORKSPACE", os.getcwd()))
+CONVERTER_PATH = Path(
+    os.environ.get(
+        "CONVERTER_PATH",
+        str(REPO_ROOT / "lib" / "server" / "keywords" / f"{COUNTRY_CODE}_converter_database.json"),
+    )
+)
 
 # Query: active Slovak companies from imported RPO
 QUERY = """
@@ -90,6 +104,111 @@ LEFT JOIN rpo.main_activity_codes mac ON mac.id = o.main_activity_code_id
 WHERE n.business_name IS NOT NULL;
 """
 
+
+def normalize_text(value: str) -> str:
+    s = str(value or "")
+    s = unicodedata.normalize("NFD", s)
+    s = "".join(ch for ch in s if unicodedata.category(ch) != "Mn")
+    s = s.lower()
+    s = s.replace("&", " and ")
+    for ch in ["'", '"', "(", ")", "/", ",", ".", ";", ":", "+", "!", "?", "[", "]", "{", "}", "|", "\\", "-"]:
+        s = s.replace(ch, " ")
+    s = " ".join(s.split())
+    return s.strip()
+
+
+def normalize_keyword(value: str) -> str:
+    return normalize_text(value).replace(" ", "_")
+
+
+def unique_strings(values):
+    seen = set()
+    out = []
+    for value in values:
+        s = str(value or "").strip()
+        if not s:
+            continue
+        if s in seen:
+            continue
+        seen.add(s)
+        out.append(s)
+    return out
+
+
+def load_keyword_rules():
+    if not CONVERTER_PATH.exists():
+        raise RuntimeError(f"Converter database not found: {CONVERTER_PATH}")
+
+    with open(CONVERTER_PATH, "r", encoding="utf-8") as f:
+        raw = json.load(f)
+
+    rules_raw = raw if isinstance(raw, list) else raw.get("rules", [])
+    parsed = []
+
+    for rule in rules_raw:
+        keyword = normalize_keyword(str(rule.get("keyword", "")))
+        terms = [
+            normalize_text(str(term or ""))
+            for term in (rule.get("terms") or [])
+            if str(term or "").strip()
+        ]
+        terms = unique_strings(terms)
+        if not keyword or not terms:
+            continue
+
+        min_hits = rule.get("minHits", 1)
+        try:
+            min_hits = max(1, int(min_hits))
+        except Exception:
+            min_hits = 1
+
+        parsed.append({
+            "keyword": keyword,
+            "terms": terms,
+            "min_hits": min_hits,
+        })
+
+    if not parsed:
+        raise RuntimeError(f"No valid keyword rules loaded from: {CONVERTER_PATH}")
+
+    return parsed
+
+
+KEYWORD_RULES = load_keyword_rules()
+
+
+def convert_company_keywords(business_name, business_activity, sector, limit=30):
+    inputs = [
+        business_name,
+        business_activity,
+        sector,
+    ]
+
+    normalized_inputs = unique_strings(
+        normalize_text(str(x or "")) for x in inputs if str(x or "").strip()
+    )
+    haystack = " ".join(normalized_inputs).strip()
+
+    if not haystack:
+        return []
+
+    scored = []
+
+    for rule in KEYWORD_RULES:
+        hits = 0
+        for term in rule["terms"]:
+            if term and term in haystack:
+                hits += 1
+
+        if hits >= rule["min_hits"]:
+            scored.append((rule["keyword"], hits))
+
+    scored.sort(key=lambda x: x[1], reverse=True)
+
+    out = unique_strings([keyword for keyword, _hits in scored])
+    return out[: max(1, min(limit, 100))]
+
+
 def get_meta_flags(conn):
     """Return (a_active: bool|None, b_active: bool|None)."""
     with conn.cursor() as cur:
@@ -101,11 +220,12 @@ def get_meta_flags(conn):
     b_active = rb[0] if rb else None
     return a_active, b_active
 
+
 def ensure_meta_rows(conn):
     """Ensure exactly one meta row exists in each table (if not, insert defaults)."""
     with conn.cursor() as cur:
         cur.execute("set statement_timeout = 0;")
-        # A
+
         cur.execute(f"select count(*) from {TABLE_A} where row_type='meta';")
         ca = cur.fetchone()[0]
         if ca == 0:
@@ -114,7 +234,7 @@ def ensure_meta_rows(conn):
                 f"values ('meta', true, %s, now(), 0);",
                 (str(uuid.uuid4()),)
             )
-        # B
+
         cur.execute(f"select count(*) from {TABLE_B} where row_type='meta';")
         cb = cur.fetchone()[0]
         if cb == 0:
@@ -124,19 +244,44 @@ def ensure_meta_rows(conn):
                 (str(uuid.uuid4()),)
             )
 
+
+def ensure_cache_table(conn):
+    """
+    Ensure the cache table exists.
+    Cache holds only supplemental fields keyed by ICO.
+    """
+    with conn.cursor() as cur:
+        cur.execute("set statement_timeout = 0;")
+        cur.execute(
+            f"""
+            create table if not exists {TABLE_CACHE} (
+              ico text primary key,
+              email text null,
+              phone text null,
+              keywords text[] not null default '{{}}'::text[],
+              created_at timestamptz not null default now(),
+              updated_at timestamptz not null default now()
+            );
+            """
+        )
+
+
 def choose_variants(a_active, b_active):
     """Return (active_table, inactive_table, active_label, inactive_label)."""
     if a_active is True and b_active is False:
         return TABLE_A, TABLE_B, "A", "B"
     if a_active is False and b_active is True:
         return TABLE_B, TABLE_A, "B", "A"
-    # If both None/False/True -> invalid state
-    raise RuntimeError(f"Invalid meta state: A.is_active={a_active}, B.is_active={b_active}. Exactly one must be true.")
+    raise RuntimeError(
+        f"Invalid meta state: A.is_active={a_active}, B.is_active={b_active}. Exactly one must be true."
+    )
+
 
 def delete_company_rows(conn, table_name):
     with conn.cursor() as cur:
         cur.execute("set statement_timeout = 0;")
         cur.execute(f"delete from {table_name} where row_type='company';")
+
 
 def set_meta_active(conn, table_name, is_active, batch_id=None, row_count=None):
     with conn.cursor() as cur:
@@ -152,7 +297,7 @@ def set_meta_active(conn, table_name, is_active, batch_id=None, row_count=None):
                     updated_at = now()
                 where row_type='meta';
                 """,
-                (str(batch_id), int(row_count))
+                (str(batch_id), int(row_count)),
             )
         else:
             cur.execute(
@@ -164,14 +309,103 @@ def set_meta_active(conn, table_name, is_active, batch_id=None, row_count=None):
                 """
             )
 
+
+def create_temp_cache_stage(conn):
+    """
+    Create a session-local staging table for cache sync.
+    This lets us publish cache changes atomically together with the A/B swap.
+    """
+    with conn.cursor() as cur:
+        cur.execute("set statement_timeout = 0;")
+        cur.execute(
+            """
+            create temp table if not exists tmp_slovakia_company_cache_sync (
+              ico text primary key,
+              keywords text[] not null default '{}'::text[]
+            ) on commit preserve rows;
+            """
+        )
+        cur.execute("truncate table tmp_slovakia_company_cache_sync;")
+
+
+def stage_cache_rows(conn, rows):
+    """
+    Stage cache rows into the temp table.
+    rows: list[(ico, keywords)]
+    """
+    if not rows:
+        return
+
+    dedup = {}
+    for ico, keywords in rows:
+        if not ico:
+            continue
+        dedup[str(ico)] = (str(ico), keywords or [])
+
+    rows2 = list(dedup.values())
+    if not rows2:
+        return
+
+    sql = """
+      insert into tmp_slovakia_company_cache_sync (ico, keywords)
+      values %s
+      on conflict (ico) do update
+      set keywords = excluded.keywords;
+    """
+
+    with conn.cursor() as cur:
+        execute_values(cur, sql, rows2, page_size=len(rows2))
+
+
+def sync_cache_from_stage(conn):
+    """
+    Atomically sync staged ICO->keywords into the real cache table.
+    Existing email/phone values are preserved.
+    Obsolete cache rows are deleted.
+    """
+    with conn.cursor() as cur:
+        cur.execute("set statement_timeout = 0;")
+
+        cur.execute(
+            f"""
+            insert into {TABLE_CACHE} (ico, email, phone, keywords, created_at, updated_at)
+            select
+              s.ico,
+              null::text as email,
+              null::text as phone,
+              coalesce(s.keywords, '{{}}'::text[]) as keywords,
+              now(),
+              now()
+            from tmp_slovakia_company_cache_sync s
+            on conflict (ico) do update
+            set
+              keywords = excluded.keywords,
+              updated_at = now();
+            """
+        )
+
+        cur.execute(
+            f"""
+            delete from {TABLE_CACHE} c
+            where not exists (
+              select 1
+              from tmp_slovakia_company_cache_sync s
+              where s.ico = c.ico
+            );
+            """
+        )
+
+
 def load_into_inactive(local_conn, supa_conn, target_table):
     """
     Stream rows from local RPO DB and insert into target_table as row_type='company'.
+    Also build a temp cache stage keyed by ICO with computed keywords.
     Returns total inserted row count.
     """
     t0 = time.time()
     total = 0
-    batch = []
+    base_batch = []
+    cache_batch = []
 
     insert_sql = f"""
       insert into {target_table}
@@ -192,58 +426,86 @@ def load_into_inactive(local_conn, supa_conn, target_table):
       where {target_table}.row_type = 'company';
     """
 
-    # server-side cursor to avoid loading all into memory
     cur = local_conn.cursor(name="rpo_company_cursor")
     cur.itersize = 5000
     cur.execute(QUERY)
 
-    def flush(rows):
-      if not rows:
-          return
+    def flush(base_rows, cache_rows):
+        if not base_rows:
+            return
 
-      dedup = {}
-      for r in rows:
-          dedup[r[1]] = r  # key = ico, posledný vyhráva
-  
-      rows2 = list(dedup.values())
-  
-      with supa_conn.cursor() as c2:
-          execute_values(c2, insert_sql, rows2, page_size=len(rows2))
-      supa_conn.commit()
+        dedup_base = {}
+        dedup_cache = {}
+
+        for row in base_rows:
+            dedup_base[row[1]] = row  # key = ico
+
+        for row in cache_rows:
+            dedup_cache[row[0]] = row  # key = ico
+
+        base_rows2 = list(dedup_base.values())
+        cache_rows2 = list(dedup_cache.values())
+
+        with supa_conn.cursor() as c2:
+            execute_values(c2, insert_sql, base_rows2, page_size=len(base_rows2))
+
+        stage_cache_rows(supa_conn, cache_rows2)
+        supa_conn.commit()
 
     for row in cur:
         ico, business_name, business_activity, sector, address, lat, lng, email, phone = row
 
-        # safety: should already be true due to WHERE, but keep it safe
         if not ico or not business_name:
             continue
 
-        batch.append((
-          "company",
-          ico,
-          business_name,
-          business_activity,
-          sector,
-          address,
-          lat,
-          lng,
-          email,
-          phone
-        ))
+        keywords = convert_company_keywords(
+            business_name=business_name,
+            business_activity=business_activity,
+            sector=sector,
+            limit=30,
+        )
+
+        base_batch.append(
+            (
+                "company",
+                ico,
+                business_name,
+                business_activity,
+                sector,
+                address,
+                lat,
+                lng,
+                email,
+                phone,
+            )
+        )
+
+        cache_batch.append(
+            (
+                ico,
+                keywords,
+            )
+        )
+
         total += 1
 
-        if len(batch) >= BATCH_SIZE:
-            flush(batch)
-            batch.clear()
+        if len(base_batch) >= BATCH_SIZE:
+            flush(base_batch, cache_batch)
+            base_batch.clear()
+            cache_batch.clear()
 
         if total % PRINT_EVERY == 0:
-            print(f"Loaded {total:,} rows into {target_table} in {time.time()-t0:.1f}s", flush=True)
+            print(
+                f"Loaded {total:,} rows into {target_table} in {time.time() - t0:.1f}s",
+                flush=True,
+            )
 
-    flush(batch)
+    flush(base_batch, cache_batch)
     cur.close()
 
-    print(f"DONE: Loaded {total:,} rows into {target_table} in {time.time()-t0:.1f}s", flush=True)
+    print(f"DONE: Loaded {total:,} rows into {target_table} in {time.time() - t0:.1f}s", flush=True)
     return total
+
 
 def main():
     t_start = time.time()
@@ -254,8 +516,9 @@ def main():
     supa.autocommit = False
 
     try:
-        # Make sure meta exists
+        ensure_cache_table(supa)
         ensure_meta_rows(supa)
+        create_temp_cache_stage(supa)
         supa.commit()
 
         a_active, b_active = get_meta_flags(supa)
@@ -263,25 +526,29 @@ def main():
 
         print(f"ACTIVE = {active_label} ({active_table})", flush=True)
         print(f"TARGET = {inactive_label} ({inactive_table})", flush=True)
+        print(f"CACHE  = {TABLE_CACHE}", flush=True)
+        print(f"DICT   = {CONVERTER_PATH}", flush=True)
 
         # 1) Clear target companies (keep meta)
         print(f"Clearing target companies in {inactive_label}...", flush=True)
         delete_company_rows(supa, inactive_table)
         supa.commit()
 
-        # 2) Load into target
-        print("Loading new dataset into target...", flush=True)
+        # 2) Load into target + stage cache rows session-locally
+        print("Loading new dataset into target and staging cache...", flush=True)
         total_rows = load_into_inactive(local, supa, inactive_table)
 
-        # 3) Atomic swap: flip meta flags
-        print("Swapping active flags (atomic)...", flush=True)
+        # 3) Atomic publish:
+        #    - sync staged cache to real cache
+        #    - flip active flags
+        print("Publishing cache + swapping active flags atomically...", flush=True)
         supa.commit()
         with supa:
-            # transaction block
+            sync_cache_from_stage(supa)
             set_meta_active(supa, inactive_table, True, batch_id=batch_id, row_count=total_rows)
             set_meta_active(supa, active_table, False)
 
-        # 4) Clear old active companies (now inactive) to avoid storing duplicates
+        # 4) Clear old active companies (now inactive) to avoid duplicates
         print(f"Clearing old companies in {active_label} (now inactive)...", flush=True)
         delete_company_rows(supa, active_table)
         supa.commit()
@@ -298,6 +565,7 @@ def main():
             supa.close()
         except Exception:
             pass
+
 
 if __name__ == "__main__":
     main()
