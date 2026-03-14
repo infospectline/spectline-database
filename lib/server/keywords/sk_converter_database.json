@@ -1,0 +1,940 @@
+{
+  "input_data_comes_from": [
+    "@/lib/server/generateProfile/runGenerateClientProfileFlow -> raw profile fields such as company name, website, city, AI-generated targets, and existing keywords",
+    "@/lib/server/match/companySource -> raw source-company fields such as business_name, business_activity, sector, address, and existing keywords",
+    "future backfill and sync scripts -> raw rows from profiles, slovakia_companies_variant_a, and slovakia_companies_variant_b"
+  ],
+  "this_file_is_responsible_for": [
+    "defining the shared keyword-segment dictionary",
+    "mapping many raw English terms and synonyms to normalized English business segments",
+    "keeping the same keyword output for both profiles and source companies"
+  ],
+  "rules": [
+    {
+      "keyword": "retail_general",
+      "terms": [
+        "maloobchod",
+        "predajňa",
+        "obchod",
+        "nakupovanie",
+        "maloobchodník",
+        "spotrebiteľský maloobchod",
+        "maloobchodný reťazec",
+        "nákupné centrum",
+        "všeobecný tovar",
+        "obchodný dom",
+        "obchod so zmiešaným tovarom"
+      ]
+    },
+    {
+      "keyword": "ecommerce_marketplaces",
+      "terms": [
+        "elektronický obchod",
+        "e obchod",
+        "online obchod",
+        "online maloobchod",
+        "internetový obchod",
+        "online trhovisko",
+        "predajca na trhovisku",
+        "digitálna predajňa",
+        "priamo spotrebiteľovi",
+        "d2c",
+        "internetový maloobchod"
+      ]
+    },
+    {
+      "keyword": "fmcg_grocery",
+      "terms": [
+        "fmcg",
+        "rýchloobrátkový spotrebný tovar",
+        "balený spotrebný tovar",
+        "cpg",
+        "potraviny",
+        "potraviny",
+        "supermarket",
+        "hypermarket",
+        "maloobchod s potravinami",
+        "denné potreby",
+        "večierka",
+        "potreby pre domácnosť",
+        "balené potraviny",
+        "nápoje",
+        "nápoje",
+        "občerstvenie"
+      ]
+    },
+    {
+      "keyword": "food_beverage_manufacturing",
+      "terms": [
+        "výroba potravín",
+        "výroba nápojov",
+        "spracovanie potravín",
+        "výroba nápojov",
+        "pekárenská výroba",
+        "mliekarenská výroba",
+        "spracovanie mäsa",
+        "výroba cukroviniek",
+        "výroba mrazených potravín",
+        "stáčiareň",
+        "výroba balených potravín"
+      ]
+    },
+    {
+      "keyword": "foodservice_restaurants",
+      "terms": [
+        "reštaurácia",
+        "reštaurácie",
+        "stravovacie služby",
+        "stravovanie",
+        "kaviareň",
+        "kaviareň",
+        "pekáreň s kaviarňou",
+        "bar",
+        "bistro",
+        "catering",
+        "rýchle občerstvenie",
+        "jedlo so sebou",
+        "donášková kuchyňa",
+        "virtuálna kuchyňa",
+        "gastronomické služby"
+      ]
+    },
+    {
+      "keyword": "home_living",
+      "terms": [
+        "bývanie a domácnosť",
+        "domov a bývanie",
+        "vybavenie domácnosti",
+        "produkty do domácnosti",
+        "doplnky do domácnosti",
+        "produkty pre domácnosť",
+        "interiérové produkty",
+        "produkty interiérového dizajnu",
+        "dekor",
+        "dekorácia",
+        "bytové dekorácie",
+        "potreby do domácnosti",
+        "kuchynské potreby",
+        "úložné riešenia",
+        "organizácia domácnosti"
+      ]
+    },
+    {
+      "keyword": "furniture_interiors",
+      "terms": [
+        "nábytok",
+        "nábytok v plochom balení",
+        "modulárny nábytok",
+        "nábytok do domácnosti",
+        "kancelársky nábytok",
+        "nábytok do obývačky",
+        "nábytok do spálne",
+        "kuchynský nábytok",
+        "nábytok do detskej izby",
+        "pohovka",
+        "stolička",
+        "stôl",
+        "šatníková skriňa",
+        "skrinka",
+        "posteľový rám"
+      ]
+    },
+    {
+      "keyword": "fashion_apparel",
+      "terms": [
+        "móda",
+        "odevy",
+        "oblečenie",
+        "odevné výrobky",
+        "dámska móda",
+        "pánska móda",
+        "detské oblečenie",
+        "voľnočasové oblečenie",
+        "formálne oblečenie",
+        "streetwear",
+        "butik",
+        "módny maloobchod",
+        "textilná móda",
+        "nositeľné produkty",
+        "módne doplnky"
+      ]
+    },
+    {
+      "keyword": "footwear_accessories",
+      "terms": [
+        "obuv",
+        "topánky",
+        "tenisky",
+        "čižmy",
+        "sandále",
+        "tašky",
+        "kabelky",
+        "opasky",
+        "peňaženky",
+        "slnečné okuliare",
+        "módne doplnky",
+        "kožené doplnky"
+      ]
+    },
+    {
+      "keyword": "consumer_electronics",
+      "terms": [
+        "spotrebná elektronika",
+        "elektronika",
+        "elektronické zariadenia",
+        "gadgety",
+        "domáce spotrebiče",
+        "malé spotrebiče",
+        "veľké domáce spotrebiče",
+        "hnedá technika",
+        "počítače",
+        "notebooky",
+        "smartfóny",
+        "mobilné telefóny",
+        "audio technika",
+        "televízor",
+        "herné zariadenia"
+      ]
+    },
+    {
+      "keyword": "it_hardware_devices",
+      "terms": [
+        "it hardvér",
+        "počítačový hardvér",
+        "servery",
+        "úložný hardvér",
+        "sieťový hardvér",
+        "tlačiarne",
+        "kopírky",
+        "monitory",
+        "periférie",
+        "pracovné stanice",
+        "počítačové príslušenstvo",
+        "distribúcia zariadení"
+      ]
+    },
+    {
+      "keyword": "software_saas",
+      "terms": [
+        "softvér",
+        "saas",
+        "softvér ako služba",
+        "aplikácia",
+        "appka",
+        "platforma",
+        "cloudový softvér",
+        "podnikový softvér",
+        "crm",
+        "erp",
+        "softvér na workflow",
+        "biznis softvér",
+        "mobilná aplikácia",
+        "webová aplikácia",
+        "digitálna platforma"
+      ]
+    },
+    {
+      "keyword": "it_services_cybersecurity",
+      "terms": [
+        "it služby",
+        "spravované služby",
+        "it poradenstvo",
+        "systémová integrácia",
+        "cloudové služby",
+        "sieťové služby",
+        "infraštruktúrne služby",
+        "helpdesk",
+        "technická podpora",
+        "kybernetická bezpečnosť",
+        "bezpečnostné operácie",
+        "ochrana koncových zariadení",
+        "správa sietí",
+        "servis hardvéru",
+        "it outsourcing"
+      ]
+    },
+    {
+      "keyword": "telecom_connectivity",
+      "terms": [
+        "telekomunikácie",
+        "telekomunikácie",
+        "poskytovateľ internetu",
+        "širokopásmové pripojenie",
+        "optická sieť",
+        "mobilný operátor",
+        "hlasové služby",
+        "služby konektivity",
+        "sieťový operátor",
+        "bezdrôtové služby",
+        "poskytovateľ komunikačných služieb"
+      ]
+    },
+    {
+      "keyword": "media_broadcast_content",
+      "terms": [
+        "médiá",
+        "vysielanie",
+        "publikovanie",
+        "digitálny obsah",
+        "streamovanie",
+        "videoprodukcia",
+        "audioprodukcia",
+        "rádio",
+        "televízne médiá",
+        "spravodajské médiá",
+        "obsahové štúdio",
+        "zábavné médiá"
+      ]
+    },
+    {
+      "keyword": "marketing_media",
+      "terms": [
+        "marketing",
+        "reklama",
+        "digitálny marketing",
+        "výkonnostný marketing",
+        "branding",
+        "kreatívna agentúra",
+        "nákup médií",
+        "marketing na sociálnych sieťach",
+        "seo",
+        "sem",
+        "ppc",
+        "obsahový marketing",
+        "public relations",
+        "správa kampaní",
+        "generovanie leadov"
+      ]
+    },
+    {
+      "keyword": "design_creative_services",
+      "terms": [
+        "dizajn",
+        "grafický dizajn",
+        "ui dizajn",
+        "ux dizajn",
+        "produktový dizajn",
+        "brand dizajn",
+        "vizuálna identita",
+        "kreatívne štúdio",
+        "motion dizajn",
+        "ilustrácia",
+        "obalový dizajn",
+        "industriálny dizajn"
+      ]
+    },
+    {
+      "keyword": "printing_packaging",
+      "terms": [
+        "tlač",
+        "tlačové služby",
+        "komerčná tlač",
+        "veľkoformátová tlač",
+        "etikety",
+        "balenie",
+        "krabice",
+        "kartóny",
+        "reklamná tlač",
+        "výroba obalov",
+        "flexibilné obaly",
+        "dodávateľ obalov"
+      ]
+    },
+    {
+      "keyword": "office_business_supplies",
+      "terms": [
+        "kancelárske potreby",
+        "firemné potreby",
+        "potreby pre pracovisko",
+        "kancelárske vybavenie",
+        "papierenské potreby",
+        "produkty pre pracovný priestor",
+        "firemné písacie potreby",
+        "maloobchod s kancelárskym nábytkom",
+        "spotrebný materiál do tlačiarní",
+        "dokumentové riešenia",
+        "služby pre pracovisko"
+      ]
+    },
+    {
+      "keyword": "books_stationery",
+      "terms": [
+        "knihy",
+        "kníhkupectvo",
+        "predaj kníh",
+        "maloobchod s vydavateľskými produktmi",
+        "papiernictvo",
+        "školské potreby",
+        "písacie potreby",
+        "papierové výrobky",
+        "zošity",
+        "vzdelávacie knihy",
+        "kancelárske písacie potreby"
+      ]
+    },
+    {
+      "keyword": "health_beauty",
+      "terms": [
+        "zdravie a krása",
+        "krása",
+        "osobná starostlivosť",
+        "kozmetika",
+        "starostlivosť o pleť",
+        "starostlivosť o vlasy",
+        "make-up",
+        "parfumy",
+        "kozmetický salón",
+        "spa produkty",
+        "wellness maloobchod",
+        "osobný wellness"
+      ]
+    },
+    {
+      "keyword": "healthcare_medical",
+      "terms": [
+        "zdravotníctvo",
+        "medicína",
+        "klinika",
+        "nemocnica",
+        "lekár",
+        "lekárska prax",
+        "zubné služby",
+        "zubár",
+        "fyzioterapia",
+        "rehabilitácia",
+        "diagnostika",
+        "zdravotnícke služby",
+        "zdravotné služby",
+        "telemedicína",
+        "ambulantná starostlivosť"
+      ]
+    },
+    {
+      "keyword": "pharmacy_wellness",
+      "terms": [
+        "lekáreň",
+        "drogéria",
+        "lieky",
+        "doplnky",
+        "vitamíny",
+        "výživové doplnky",
+        "maloobchod so zdravotníckymi potrebami",
+        "wellness doplnky",
+        "nutričné doplnky",
+        "farmaceutický maloobchod"
+      ]
+    },
+    {
+      "keyword": "biotech_life_sciences",
+      "terms": [
+        "biotechnológie",
+        "biotechnológia",
+        "vedy o živote",
+        "laboratórny výskum",
+        "klinický výskum",
+        "molekulárna diagnostika",
+        "genomika",
+        "biofarmácia",
+        "farmaceutický vývoj",
+        "medicínsky výskum"
+      ]
+    },
+    {
+      "keyword": "finance_insurance",
+      "terms": [
+        "financie",
+        "finančné služby",
+        "bankovníctvo",
+        "spotrebiteľské financovanie",
+        "platby",
+        "fintech",
+        "poistenie",
+        "úvery",
+        "hypotéka",
+        "investičné služby",
+        "správa majetku",
+        "lízing",
+        "asset management",
+        "retail banking"
+      ]
+    },
+    {
+      "keyword": "legal_accounting",
+      "terms": [
+        "právo",
+        "zákon",
+        "právnik",
+        "advokát",
+        "notár",
+        "compliance",
+        "účtovníctvo",
+        "vedenie účtovníctva",
+        "daňové poradenstvo",
+        "audit",
+        "mzdy a personalistika",
+        "korporátne služby",
+        "právne poradenstvo",
+        "finančné výkazníctvo"
+      ]
+    },
+    {
+      "keyword": "professional_services_consulting",
+      "terms": [
+        "poradenstvo",
+        "konzultácie",
+        "advisory",
+        "biznis poradenstvo",
+        "strategické poradenstvo",
+        "manažérske poradenstvo",
+        "profesionálne služby",
+        "outsourcing",
+        "firemné poradenstvo",
+        "korporátne poradenstvo",
+        "operačné poradenstvo",
+        "procesné poradenstvo"
+      ]
+    },
+    {
+      "keyword": "hr_recruitment",
+      "terms": [
+        "ľudské zdroje",
+        "hr",
+        "nábor",
+        "personálne obsadenie",
+        "headhunting",
+        "získavanie talentov",
+        "pracovná agentúra",
+        "dočasné pridelenie pracovníkov",
+        "executive search",
+        "riešenia pracovnej sily",
+        "náborová agentúra"
+      ]
+    },
+    {
+      "keyword": "real_estate",
+      "terms": [
+        "nehnuteľnosti",
+        "majetok",
+        "reality",
+        "predaj nehnuteľností",
+        "prenájom nehnuteľností",
+        "správa nehnuteľností",
+        "komerčné nehnuteľnosti",
+        "rezidenčné nehnuteľnosti",
+        "developerské nehnuteľnosti",
+        "realitné sprostredkovanie",
+        "lízing nehnuteľností"
+      ]
+    },
+    {
+      "keyword": "construction_building",
+      "terms": [
+        "stavebníctvo",
+        "výstavba",
+        "dodávateľ stavieb",
+        "staviteľ",
+        "pozemné staviteľstvo",
+        "stavebné služby",
+        "stavebné inštalácie",
+        "renovácia",
+        "rekonštrukcia",
+        "fit out",
+        "generálny dodávateľ",
+        "špecializovaný dodávateľ",
+        "montáž stavebných materiálov"
+      ]
+    },
+    {
+      "keyword": "diy_garden",
+      "terms": [
+        "diy",
+        "urob si sám",
+        "zlepšenie bývania",
+        "železiarstvo",
+        "náradie",
+        "elektrické náradie",
+        "maloobchod so stavebninami",
+        "potreby na renováciu",
+        "záhrada",
+        "záhradníctvo",
+        "záhradné centrum",
+        "záhradná technika",
+        "vonkajšie bývanie",
+        "potreby pre krajinárstvo",
+        "hobby market"
+      ]
+    },
+    {
+      "keyword": "agriculture_agritech",
+      "terms": [
+        "poľnohospodárstvo",
+        "farmárstvo",
+        "agritech",
+        "poľnohospodárske potreby",
+        "hospodárske zvieratá",
+        "rastlinná výroba",
+        "poľnohospodárska technika",
+        "semená",
+        "hnojivá",
+        "skleník",
+        "precízne poľnohospodárstvo",
+        "farmárske technológie"
+      ]
+    },
+    {
+      "keyword": "industrial_b2b",
+      "terms": [
+        "priemysel",
+        "b2b",
+        "priemyselné potreby",
+        "firemné potreby",
+        "stroje",
+        "súčiastky strojov",
+        "suroviny",
+        "priemyselné zariadenia",
+        "továrenské vybavenie",
+        "komerčné vybavenie",
+        "technické zásobovanie",
+        "procesné zariadenia",
+        "priemyselná distribúcia"
+      ]
+    },
+    {
+      "keyword": "manufacturing",
+      "terms": [
+        "výroba",
+        "produkcia",
+        "továreň",
+        "fabrikácia",
+        "montáž",
+        "spracovateľský závod",
+        "priemyselná výroba",
+        "zákazková výroba",
+        "sériová výroba",
+        "zmluvná výroba",
+        "výrobná linka",
+        "výroba komponentov"
+      ]
+    },
+    {
+      "keyword": "chemicals_materials",
+      "terms": [
+        "chemikálie",
+        "špeciálne chemikálie",
+        "priemyselné chemikálie",
+        "suroviny",
+        "materiálové vedy",
+        "plasty",
+        "polyméry",
+        "kompozity",
+        "výroba skla",
+        "výroba papiera",
+        "obalové materiály"
+      ]
+    },
+    {
+      "keyword": "mining_metals",
+      "terms": [
+        "ťažba",
+        "kovy",
+        "spracovanie kovov",
+        "oceľ",
+        "hliník",
+        "meď",
+        "ťažba nerastov",
+        "lom",
+        "metalurgia",
+        "spracovanie rudy",
+        "priemyselné kovy"
+      ]
+    },
+    {
+      "keyword": "energy_environment",
+      "terms": [
+        "energia",
+        "obnoviteľná energia",
+        "solárna energia",
+        "fotovoltika",
+        "veterná energia",
+        "tepelné čerpadlá",
+        "environmentálne služby",
+        "recyklácia",
+        "spracovanie odpadu",
+        "služby udržateľnosti",
+        "obehové hospodárstvo",
+        "čistá energia",
+        "odpadové hospodárstvo",
+        "environmentálne inžinierstvo"
+      ]
+    },
+    {
+      "keyword": "utilities_telecom",
+      "terms": [
+        "verejné služby",
+        "dodávka energie",
+        "elektrina",
+        "dodávka plynu",
+        "vodárenské služby",
+        "komunálne odpadové služby",
+        "centrálne vykurovanie",
+        "verejný podnik",
+        "poskytovateľ verejných služieb",
+        "distribúcia energie"
+      ]
+    },
+    {
+      "keyword": "logistics_supply_chain",
+      "terms": [
+        "logistika",
+        "dodávateľský reťazec",
+        "doprava",
+        "preprava",
+        "nákladná doprava",
+        "doručovanie",
+        "fulfillment",
+        "skladovanie",
+        "distribučné centrum",
+        "last mile delivery",
+        "kuriér",
+        "third party logistics",
+        "3pl",
+        "chladiarenská logistika"
+      ]
+    },
+    {
+      "keyword": "automotive",
+      "terms": [
+        "automotive",
+        "auto",
+        "autá",
+        "vozidlo",
+        "vozidlá",
+        "autobazár alebo predajca áut",
+        "jazdené autá",
+        "autodiely",
+        "auto doplnky",
+        "oprava áut",
+        "servis vozidiel",
+        "pneuservis",
+        "správa vozového parku",
+        "služby mobility"
+      ]
+    },
+    {
+      "keyword": "aerospace_defense",
+      "terms": [
+        "letecký a kozmický priemysel",
+        "letectvo",
+        "lietadlá",
+        "obrana",
+        "vojenské vybavenie",
+        "kozmické technológie",
+        "letecké inžinierstvo",
+        "údržba lietadiel",
+        "obranné systémy",
+        "dronové technológie"
+      ]
+    },
+    {
+      "keyword": "marine_shipping",
+      "terms": [
+        "námorný sektor",
+        "námorná doprava",
+        "lodné linky",
+        "prístavné služby",
+        "stavba lodí",
+        "údržba plavidiel",
+        "oceánska nákladná doprava",
+        "námorné vybavenie",
+        "námorné systémy",
+        "námorná logistika"
+      ]
+    },
+    {
+      "keyword": "sports_outdoors",
+      "terms": [
+        "šport",
+        "športové potreby",
+        "fitness vybavenie",
+        "outdoor",
+        "outdoor vybavenie",
+        "kempovanie",
+        "turistika",
+        "cyklistika",
+        "beh",
+        "lyžovanie",
+        "športové oblečenie",
+        "vybavenie na cvičenie",
+        "dobrodružné vybavenie"
+      ]
+    },
+    {
+      "keyword": "fitness_wellness_services",
+      "terms": [
+        "fitness",
+        "posilňovňa",
+        "osobný tréning",
+        "wellness centrum",
+        "jóga štúdio",
+        "pilates",
+        "spa",
+        "regeneračné služby",
+        "fyzický wellness",
+        "tréningové štúdio"
+      ]
+    },
+    {
+      "keyword": "toys_kids",
+      "terms": [
+        "hračky",
+        "obchod s hračkami",
+        "produkty pre deti",
+        "produkty pre bábätká",
+        "produkty do detskej izby",
+        "produkty pre starostlivosť o deti",
+        "produkty pre deti",
+        "edukačné hračky",
+        "kočíky",
+        "plienky",
+        "produkty pre dojčatá",
+        "potreby pre rodičov"
+      ]
+    },
+    {
+      "keyword": "pet_supplies",
+      "terms": [
+        "chovateľské potreby",
+        "obchod pre zvieratá",
+        "krmivo pre zvieratá",
+        "starostlivosť o zvieratá",
+        "veterinárny maloobchod",
+        "produkty pre psov",
+        "produkty pre mačky",
+        "akvaristické potreby",
+        "starostlivosť o domácich miláčikov",
+        "wellness pre zvieratá"
+      ]
+    },
+    {
+      "keyword": "jewelry_watches",
+      "terms": [
+        "šperky",
+        "šperky",
+        "hodinky",
+        "luxusné doplnky",
+        "zlaté šperky",
+        "strieborné šperky",
+        "diamanty",
+        "zásnubné prstene",
+        "obchod s hodinkami",
+        "luxusné šperky"
+      ]
+    },
+    {
+      "keyword": "leisure_entertainment",
+      "terms": [
+        "voľný čas",
+        "zábava",
+        "predaj vstupeniek",
+        "vstupenky na podujatia",
+        "kino",
+        "herná zábava",
+        "digitálny obsah",
+        "streamovanie",
+        "obchod s hudbou",
+        "zábavný park",
+        "arkáda",
+        "hobby zábava"
+      ]
+    },
+    {
+      "keyword": "travel_hospitality",
+      "terms": [
+        "cestovanie",
+        "turizmus",
+        "pohostinstvo",
+        "hotel",
+        "ubytovanie",
+        "penzión",
+        "rezervácie",
+        "cestovná kancelária",
+        "rezort",
+        "rekreačné prenájmy",
+        "krátkodobé ubytovanie",
+        "pohostinské služby"
+      ]
+    },
+    {
+      "keyword": "events_experiences",
+      "terms": [
+        "podujatia",
+        "eventová agentúra",
+        "produkcia podujatí",
+        "konferenčné služby",
+        "služby pre veľtrhy",
+        "svadobné plánovanie",
+        "zážitkové podujatia",
+        "festivalová produkcia",
+        "firemné podujatia",
+        "služby pre priestory"
+      ]
+    },
+    {
+      "keyword": "education_training",
+      "terms": [
+        "vzdelávanie",
+        "školenia",
+        "akadémia",
+        "škola",
+        "kurz",
+        "kurzy",
+        "e learning",
+        "online vzdelávanie",
+        "odborné školenia",
+        "doučovanie",
+        "certifikácia",
+        "odborné vzdelávanie",
+        "vysokoškolské vzdelávanie"
+      ]
+    },
+    {
+      "keyword": "public_sector_nonprofit",
+      "terms": [
+        "verejný sektor",
+        "vládne služby",
+        "mestské služby",
+        "ngo",
+        "nezisková organizácia",
+        "charita",
+        "nadácia",
+        "združenie",
+        "občianske združenie",
+        "sociálne služby",
+        "verejná správa",
+        "komunitné služby"
+      ]
+    },
+    {
+      "keyword": "security_facility_services",
+      "terms": [
+        "bezpečnostné služby",
+        "strážne služby",
+        "facility služby",
+        "upratovacie služby",
+        "janitorial",
+        "monitorovanie",
+        "alarmové systémy",
+        "cctv",
+        "údržba budov",
+        "facility management",
+        "správa nehnuteľností",
+        "integrované facility služby"
+      ]
+    }
+  ],
+  "data_continues_to": [
+    "@/lib/server/keywords/converter.ts -> loads this file and converts raw text into normalized English business-segment keywords",
+    "@/lib/server/generateProfile/runGenerateProfileFlow -> can save resulting keywords into profiles.keywords",
+    "future backfill and sync scripts -> can write resulting keywords into slovakia_companies_variant_a.keywords and slovakia_companies_variant_b.keywords"
+  ]
+}
