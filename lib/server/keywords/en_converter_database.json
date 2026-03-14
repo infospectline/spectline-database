@@ -1,0 +1,940 @@
+{
+  "input_data_comes_from": [
+    "@/lib/server/generateProfile/runGenerateClientProfileFlow -> raw profile fields such as company name, website, city, AI-generated targets, and existing keywords",
+    "@/lib/server/match/companySource -> raw source-company fields such as business_name, business_activity, sector, address, and existing keywords",
+    "future backfill and sync scripts -> raw rows from profiles, slovakia_companies_variant_a, and slovakia_companies_variant_b"
+  ],
+  "this_file_is_responsible_for": [
+    "defining the shared keyword-segment dictionary",
+    "mapping many raw English terms and synonyms to normalized English business segments",
+    "keeping the same keyword output for both profiles and source companies"
+  ],
+  "rules": [
+    {
+      "keyword": "retail_general",
+      "terms": [
+        "retail",
+        "store",
+        "shop",
+        "shopping",
+        "retailer",
+        "consumer retail",
+        "retail chain",
+        "shopping center",
+        "general merchandise",
+        "department store",
+        "variety store"
+      ]
+    },
+    {
+      "keyword": "ecommerce_marketplaces",
+      "terms": [
+        "ecommerce",
+        "e commerce",
+        "online store",
+        "online retail",
+        "webshop",
+        "online marketplace",
+        "marketplace seller",
+        "digital storefront",
+        "direct to consumer",
+        "d2c",
+        "internet retail"
+      ]
+    },
+    {
+      "keyword": "fmcg_grocery",
+      "terms": [
+        "fmcg",
+        "fast moving consumer goods",
+        "consumer packaged goods",
+        "cpg",
+        "grocery",
+        "groceries",
+        "supermarket",
+        "hypermarket",
+        "food retail",
+        "daily essentials",
+        "convenience store",
+        "household essentials",
+        "packaged food",
+        "beverages",
+        "drinks",
+        "snacks"
+      ]
+    },
+    {
+      "keyword": "food_beverage_manufacturing",
+      "terms": [
+        "food manufacturing",
+        "beverage manufacturing",
+        "food processing",
+        "drink production",
+        "bakery production",
+        "dairy production",
+        "meat processing",
+        "confectionery manufacturing",
+        "frozen food production",
+        "bottling plant",
+        "packaged food production"
+      ]
+    },
+    {
+      "keyword": "foodservice_restaurants",
+      "terms": [
+        "restaurant",
+        "restaurants",
+        "foodservice",
+        "dining",
+        "cafe",
+        "coffee shop",
+        "bakery cafe",
+        "bar",
+        "bistro",
+        "catering",
+        "fast food",
+        "takeaway",
+        "delivery kitchen",
+        "cloud kitchen",
+        "hospitality dining"
+      ]
+    },
+    {
+      "keyword": "home_living",
+      "terms": [
+        "home living",
+        "home and living",
+        "home furnishings",
+        "home goods",
+        "home accessories",
+        "household products",
+        "interior products",
+        "interior design products",
+        "decor",
+        "decoration",
+        "home decor",
+        "housewares",
+        "kitchenware",
+        "storage solutions",
+        "home organization"
+      ]
+    },
+    {
+      "keyword": "furniture_interiors",
+      "terms": [
+        "furniture",
+        "flat pack furniture",
+        "modular furniture",
+        "home furniture",
+        "office furniture",
+        "living room furniture",
+        "bedroom furniture",
+        "kitchen furniture",
+        "children bedroom furniture",
+        "sofa",
+        "chair",
+        "table",
+        "wardrobe",
+        "cabinet",
+        "bed frame"
+      ]
+    },
+    {
+      "keyword": "fashion_apparel",
+      "terms": [
+        "fashion",
+        "apparel",
+        "clothing",
+        "garments",
+        "womenswear",
+        "menswear",
+        "kidswear",
+        "casualwear",
+        "formalwear",
+        "streetwear",
+        "boutique",
+        "fashion retail",
+        "textile fashion",
+        "wearables",
+        "fashion accessories"
+      ]
+    },
+    {
+      "keyword": "footwear_accessories",
+      "terms": [
+        "footwear",
+        "shoes",
+        "sneakers",
+        "boots",
+        "sandals",
+        "bags",
+        "handbags",
+        "belts",
+        "wallets",
+        "sunglasses",
+        "fashion accessories",
+        "leather accessories"
+      ]
+    },
+    {
+      "keyword": "consumer_electronics",
+      "terms": [
+        "consumer electronics",
+        "electronics",
+        "electronic devices",
+        "gadgets",
+        "home appliances",
+        "small appliances",
+        "white goods",
+        "brown goods",
+        "computers",
+        "laptops",
+        "smartphones",
+        "mobile phones",
+        "audio equipment",
+        "television",
+        "gaming devices"
+      ]
+    },
+    {
+      "keyword": "it_hardware_devices",
+      "terms": [
+        "it hardware",
+        "computer hardware",
+        "servers",
+        "storage hardware",
+        "network hardware",
+        "printers",
+        "copiers",
+        "monitors",
+        "peripherals",
+        "workstations",
+        "computer accessories",
+        "device distribution"
+      ]
+    },
+    {
+      "keyword": "software_saas",
+      "terms": [
+        "software",
+        "saas",
+        "software as a service",
+        "application",
+        "app",
+        "platform",
+        "cloud software",
+        "enterprise software",
+        "crm",
+        "erp",
+        "workflow software",
+        "business software",
+        "mobile app",
+        "web app",
+        "digital platform"
+      ]
+    },
+    {
+      "keyword": "it_services_cybersecurity",
+      "terms": [
+        "it services",
+        "managed services",
+        "it consulting",
+        "system integration",
+        "cloud services",
+        "network services",
+        "infrastructure services",
+        "help desk",
+        "technical support",
+        "cybersecurity",
+        "security operations",
+        "endpoint security",
+        "network administration",
+        "hardware service",
+        "it outsourcing"
+      ]
+    },
+    {
+      "keyword": "telecom_connectivity",
+      "terms": [
+        "telecom",
+        "telecommunications",
+        "internet provider",
+        "broadband",
+        "fiber network",
+        "mobile operator",
+        "voice services",
+        "connectivity services",
+        "network operator",
+        "wireless services",
+        "communications provider"
+      ]
+    },
+    {
+      "keyword": "media_broadcast_content",
+      "terms": [
+        "media",
+        "broadcast",
+        "publishing",
+        "digital content",
+        "streaming",
+        "video production",
+        "audio production",
+        "radio",
+        "television media",
+        "news media",
+        "content studio",
+        "entertainment media"
+      ]
+    },
+    {
+      "keyword": "marketing_media",
+      "terms": [
+        "marketing",
+        "advertising",
+        "digital marketing",
+        "performance marketing",
+        "branding",
+        "creative agency",
+        "media buying",
+        "social media marketing",
+        "seo",
+        "sem",
+        "ppc",
+        "content marketing",
+        "public relations",
+        "campaign management",
+        "lead generation"
+      ]
+    },
+    {
+      "keyword": "design_creative_services",
+      "terms": [
+        "design",
+        "graphic design",
+        "ui design",
+        "ux design",
+        "product design",
+        "brand design",
+        "visual identity",
+        "creative studio",
+        "motion design",
+        "illustration",
+        "packaging design",
+        "industrial design"
+      ]
+    },
+    {
+      "keyword": "printing_packaging",
+      "terms": [
+        "printing",
+        "print services",
+        "commercial printing",
+        "large format print",
+        "labels",
+        "packaging",
+        "boxes",
+        "cartons",
+        "promotional print",
+        "packaging production",
+        "flexible packaging",
+        "packaging supplier"
+      ]
+    },
+    {
+      "keyword": "office_business_supplies",
+      "terms": [
+        "office supplies",
+        "business supplies",
+        "workplace supplies",
+        "office equipment",
+        "paper supplies",
+        "workspace products",
+        "business stationery",
+        "office furniture retail",
+        "printer supplies",
+        "document solutions",
+        "workplace services"
+      ]
+    },
+    {
+      "keyword": "books_stationery",
+      "terms": [
+        "books",
+        "bookstore",
+        "book retail",
+        "publishing retail",
+        "stationery",
+        "school supplies",
+        "writing supplies",
+        "paper products",
+        "notebooks",
+        "educational books",
+        "office stationery"
+      ]
+    },
+    {
+      "keyword": "health_beauty",
+      "terms": [
+        "health and beauty",
+        "beauty",
+        "personal care",
+        "cosmetics",
+        "skincare",
+        "haircare",
+        "makeup",
+        "fragrance",
+        "beauty salon",
+        "spa products",
+        "wellness retail",
+        "personal wellness"
+      ]
+    },
+    {
+      "keyword": "healthcare_medical",
+      "terms": [
+        "healthcare",
+        "medical",
+        "clinic",
+        "hospital",
+        "doctor",
+        "medical practice",
+        "dental",
+        "dentist",
+        "physiotherapy",
+        "rehabilitation",
+        "diagnostics",
+        "medical services",
+        "health services",
+        "telemedicine",
+        "outpatient care"
+      ]
+    },
+    {
+      "keyword": "pharmacy_wellness",
+      "terms": [
+        "pharmacy",
+        "drugstore",
+        "medicines",
+        "supplements",
+        "vitamins",
+        "health supplements",
+        "medical supplies retail",
+        "wellness supplements",
+        "nutritional supplements",
+        "pharmaceutical retail"
+      ]
+    },
+    {
+      "keyword": "biotech_life_sciences",
+      "terms": [
+        "biotech",
+        "biotechnology",
+        "life sciences",
+        "laboratory research",
+        "clinical research",
+        "molecular diagnostics",
+        "genomics",
+        "biopharma",
+        "pharmaceutical development",
+        "medical research"
+      ]
+    },
+    {
+      "keyword": "finance_insurance",
+      "terms": [
+        "finance",
+        "financial services",
+        "banking",
+        "consumer finance",
+        "payments",
+        "fintech",
+        "insurance",
+        "loans",
+        "mortgage",
+        "investment services",
+        "wealth management",
+        "leasing",
+        "asset management",
+        "retail banking"
+      ]
+    },
+    {
+      "keyword": "legal_accounting",
+      "terms": [
+        "legal",
+        "law",
+        "lawyer",
+        "attorney",
+        "notary",
+        "compliance",
+        "accounting",
+        "bookkeeping",
+        "tax advisory",
+        "audit",
+        "payroll",
+        "corporate services",
+        "legal advisory",
+        "financial reporting"
+      ]
+    },
+    {
+      "keyword": "professional_services_consulting",
+      "terms": [
+        "consulting",
+        "consultancy",
+        "advisory",
+        "business consulting",
+        "strategy consulting",
+        "management consulting",
+        "professional services",
+        "outsourcing",
+        "business advisory",
+        "corporate advisory",
+        "operational consulting",
+        "process consulting"
+      ]
+    },
+    {
+      "keyword": "hr_recruitment",
+      "terms": [
+        "human resources",
+        "hr",
+        "recruitment",
+        "staffing",
+        "headhunting",
+        "talent acquisition",
+        "employment agency",
+        "temporary staffing",
+        "executive search",
+        "workforce solutions",
+        "recruitment agency"
+      ]
+    },
+    {
+      "keyword": "real_estate",
+      "terms": [
+        "real estate",
+        "property",
+        "realty",
+        "property sales",
+        "property rental",
+        "property management",
+        "commercial real estate",
+        "residential real estate",
+        "development property",
+        "real estate brokerage",
+        "leasing property"
+      ]
+    },
+    {
+      "keyword": "construction_building",
+      "terms": [
+        "construction",
+        "building",
+        "contractor",
+        "builder",
+        "civil engineering",
+        "construction services",
+        "building installation",
+        "renovation",
+        "reconstruction",
+        "fit out",
+        "general contractor",
+        "specialty contractor",
+        "building materials installation"
+      ]
+    },
+    {
+      "keyword": "diy_garden",
+      "terms": [
+        "diy",
+        "do it yourself",
+        "home improvement",
+        "hardware store",
+        "tools",
+        "power tools",
+        "building supplies retail",
+        "renovation supplies",
+        "garden",
+        "gardening",
+        "garden center",
+        "garden equipment",
+        "outdoor living",
+        "landscaping supplies",
+        "hobby market"
+      ]
+    },
+    {
+      "keyword": "agriculture_agritech",
+      "terms": [
+        "agriculture",
+        "farming",
+        "agritech",
+        "agricultural supplies",
+        "livestock",
+        "crop production",
+        "farm equipment",
+        "seeds",
+        "fertilizers",
+        "greenhouse",
+        "precision agriculture",
+        "farm technology"
+      ]
+    },
+    {
+      "keyword": "industrial_b2b",
+      "terms": [
+        "industrial",
+        "b2b",
+        "industrial supplies",
+        "business supplies",
+        "machinery",
+        "machine parts",
+        "raw materials",
+        "industrial equipment",
+        "factory equipment",
+        "commercial equipment",
+        "engineering supply",
+        "process equipment",
+        "industrial distribution"
+      ]
+    },
+    {
+      "keyword": "manufacturing",
+      "terms": [
+        "manufacturing",
+        "production",
+        "factory",
+        "fabrication",
+        "assembly",
+        "processing plant",
+        "industrial production",
+        "custom manufacturing",
+        "serial production",
+        "contract manufacturing",
+        "production line",
+        "component manufacturing"
+      ]
+    },
+    {
+      "keyword": "chemicals_materials",
+      "terms": [
+        "chemicals",
+        "specialty chemicals",
+        "industrial chemicals",
+        "raw materials",
+        "materials science",
+        "plastics",
+        "polymers",
+        "composites",
+        "glass manufacturing",
+        "paper manufacturing",
+        "packaging materials"
+      ]
+    },
+    {
+      "keyword": "mining_metals",
+      "terms": [
+        "mining",
+        "metals",
+        "metal processing",
+        "steel",
+        "aluminum",
+        "copper",
+        "mineral extraction",
+        "quarry",
+        "metallurgy",
+        "ore processing",
+        "industrial metals"
+      ]
+    },
+    {
+      "keyword": "energy_environment",
+      "terms": [
+        "energy",
+        "renewable energy",
+        "solar",
+        "photovoltaic",
+        "wind energy",
+        "heat pumps",
+        "environmental services",
+        "recycling",
+        "waste processing",
+        "sustainability services",
+        "circular economy",
+        "clean energy",
+        "waste management",
+        "environmental engineering"
+      ]
+    },
+    {
+      "keyword": "utilities_telecom",
+      "terms": [
+        "utilities",
+        "energy supply",
+        "electricity",
+        "gas supply",
+        "water utility",
+        "waste management utility",
+        "district heating",
+        "public utility",
+        "utility provider",
+        "energy distribution"
+      ]
+    },
+    {
+      "keyword": "logistics_supply_chain",
+      "terms": [
+        "logistics",
+        "supply chain",
+        "transport",
+        "shipping",
+        "freight",
+        "delivery",
+        "fulfillment",
+        "warehousing",
+        "distribution center",
+        "last mile delivery",
+        "courier",
+        "third party logistics",
+        "3pl",
+        "cold chain logistics"
+      ]
+    },
+    {
+      "keyword": "automotive",
+      "terms": [
+        "automotive",
+        "car",
+        "cars",
+        "vehicle",
+        "vehicles",
+        "car dealer",
+        "used cars",
+        "auto parts",
+        "car accessories",
+        "car repair",
+        "vehicle service",
+        "tire service",
+        "fleet service",
+        "mobility services"
+      ]
+    },
+    {
+      "keyword": "aerospace_defense",
+      "terms": [
+        "aerospace",
+        "aviation",
+        "aircraft",
+        "defense",
+        "military equipment",
+        "space technology",
+        "aerospace engineering",
+        "aircraft maintenance",
+        "defense systems",
+        "drone technology"
+      ]
+    },
+    {
+      "keyword": "marine_shipping",
+      "terms": [
+        "marine",
+        "maritime",
+        "shipping lines",
+        "port services",
+        "shipbuilding",
+        "vessel maintenance",
+        "ocean freight",
+        "marine equipment",
+        "naval systems",
+        "maritime logistics"
+      ]
+    },
+    {
+      "keyword": "sports_outdoors",
+      "terms": [
+        "sports",
+        "sporting goods",
+        "fitness equipment",
+        "outdoor",
+        "outdoor gear",
+        "camping",
+        "hiking",
+        "cycling",
+        "running",
+        "ski",
+        "sportswear",
+        "exercise equipment",
+        "adventure gear"
+      ]
+    },
+    {
+      "keyword": "fitness_wellness_services",
+      "terms": [
+        "fitness",
+        "gym",
+        "personal training",
+        "wellness center",
+        "yoga studio",
+        "pilates",
+        "spa",
+        "recovery services",
+        "physical wellness",
+        "training studio"
+      ]
+    },
+    {
+      "keyword": "toys_kids",
+      "terms": [
+        "toys",
+        "toy store",
+        "kids products",
+        "baby products",
+        "nursery products",
+        "childcare products",
+        "children products",
+        "educational toys",
+        "strollers",
+        "diapers",
+        "infant products",
+        "parenting essentials"
+      ]
+    },
+    {
+      "keyword": "pet_supplies",
+      "terms": [
+        "pet supplies",
+        "pet shop",
+        "pet food",
+        "animal care",
+        "veterinary retail",
+        "dog products",
+        "cat products",
+        "aquarium supplies",
+        "pet care",
+        "pet wellness"
+      ]
+    },
+    {
+      "keyword": "jewelry_watches",
+      "terms": [
+        "jewelry",
+        "jewellery",
+        "watches",
+        "luxury accessories",
+        "gold jewelry",
+        "silver jewelry",
+        "diamonds",
+        "engagement rings",
+        "watch store",
+        "fine jewelry"
+      ]
+    },
+    {
+      "keyword": "leisure_entertainment",
+      "terms": [
+        "leisure",
+        "entertainment",
+        "ticketing",
+        "events tickets",
+        "cinema",
+        "gaming entertainment",
+        "digital content",
+        "streaming",
+        "music store",
+        "theme park",
+        "arcade",
+        "hobby entertainment"
+      ]
+    },
+    {
+      "keyword": "travel_hospitality",
+      "terms": [
+        "travel",
+        "tourism",
+        "hospitality",
+        "hotel",
+        "accommodation",
+        "guesthouse",
+        "booking",
+        "travel agency",
+        "resort",
+        "vacation rentals",
+        "short term stay",
+        "hospitality services"
+      ]
+    },
+    {
+      "keyword": "events_experiences",
+      "terms": [
+        "events",
+        "event agency",
+        "event production",
+        "conference services",
+        "trade show services",
+        "wedding planning",
+        "live experiences",
+        "festival production",
+        "corporate events",
+        "venue services"
+      ]
+    },
+    {
+      "keyword": "education_training",
+      "terms": [
+        "education",
+        "training",
+        "academy",
+        "school",
+        "course",
+        "courses",
+        "e learning",
+        "online learning",
+        "professional training",
+        "tutoring",
+        "certification",
+        "vocational training",
+        "higher education"
+      ]
+    },
+    {
+      "keyword": "public_sector_nonprofit",
+      "terms": [
+        "public sector",
+        "government services",
+        "municipal services",
+        "ngo",
+        "nonprofit",
+        "charity",
+        "foundation",
+        "association",
+        "civic association",
+        "social services",
+        "public administration",
+        "community services"
+      ]
+    },
+    {
+      "keyword": "security_facility_services",
+      "terms": [
+        "security services",
+        "guard services",
+        "facility services",
+        "cleaning services",
+        "janitorial",
+        "surveillance",
+        "alarm systems",
+        "cctv",
+        "building maintenance",
+        "facility management",
+        "property upkeep",
+        "integrated facility services"
+      ]
+    }
+  ],
+  "data_continues_to": [
+    "@/lib/server/keywords/converter.ts -> loads this file and converts raw text into normalized English business-segment keywords",
+    "@/lib/server/generateProfile/runGenerateProfileFlow -> can save resulting keywords into profiles.keywords",
+    "future backfill and sync scripts -> can write resulting keywords into slovakia_companies_variant_a.keywords and slovakia_companies_variant_b.keywords"
+  ]
+}
