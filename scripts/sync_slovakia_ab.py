@@ -92,9 +92,7 @@ SELECT
   mac.name AS sector,
   adr.address,
   NULL::float8 AS latitude,
-  NULL::float8 AS longitude,
-  NULL::text AS email,
-  NULL::text AS phone
+  NULL::float8 AS longitude
 FROM active_org o
 JOIN ico_per_org i ON i.organization_id = o.id
 LEFT JOIN name_per_org n ON n.organization_id = o.id
@@ -407,10 +405,10 @@ def load_into_inactive(local_conn, supa_conn, target_table):
     base_batch = []
     cache_batch = []
 
-    insert_sql = f"""
+   insert_sql = f"""
       insert into {target_table}
         (row_type, ico, business_name, business_activity, sector, address,
-         latitude, longitude, email, phone)
+         latitude, longitude)
       values %s
       on conflict (ico, row_type) do update
       set
@@ -420,8 +418,6 @@ def load_into_inactive(local_conn, supa_conn, target_table):
         address = excluded.address,
         latitude = excluded.latitude,
         longitude = excluded.longitude,
-        email = excluded.email,
-        phone = excluded.phone,
         updated_at = now()
       where {target_table}.row_type = 'company';
     """
@@ -453,7 +449,7 @@ def load_into_inactive(local_conn, supa_conn, target_table):
         supa_conn.commit()
 
     for row in cur:
-        ico, business_name, business_activity, sector, address, lat, lng, email, phone = row
+        ico, business_name, business_activity, sector, address, lat, lng = row
 
         if not ico or not business_name:
             continue
@@ -465,7 +461,7 @@ def load_into_inactive(local_conn, supa_conn, target_table):
             limit=30,
         )
 
-        base_batch.append(
+       base_batch.append(
             (
                 "company",
                 ico,
@@ -475,8 +471,6 @@ def load_into_inactive(local_conn, supa_conn, target_table):
                 address,
                 lat,
                 lng,
-                email,
-                phone,
             )
         )
 
