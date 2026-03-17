@@ -405,7 +405,7 @@ def load_into_inactive(local_conn, supa_conn, target_table):
     base_batch = []
     cache_batch = []
 
-   insert_sql = f"""
+    insert_sql = f"""
       insert into {target_table}
         (row_type, ico, business_name, business_activity, sector, address,
          latitude, longitude)
@@ -461,7 +461,7 @@ def load_into_inactive(local_conn, supa_conn, target_table):
             limit=30,
         )
 
-       base_batch.append(
+        base_batch.append(
             (
                 "company",
                 ico,
